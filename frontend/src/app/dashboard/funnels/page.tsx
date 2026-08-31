@@ -13,7 +13,7 @@ import {
   Cell
 } from 'recharts';
 import { Info, AlertTriangle, Loader2 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/services/api';
 
 const COLORS = ['#4f46e5', '#6366f1', '#818cf8', '#94a3b8', '#cbd5e1', '#e2e8f0'];
 
@@ -25,7 +25,7 @@ export default function FunnelsPage() {
     const fetchData = async () => {
       try {
         const projectId = '6a1072fec491a8a6be8732a0';
-        const res = await axios.get(`http://localhost:5001/api/analytics/funnel?projectId=${projectId}`);
+        const res = await api.get(`/analytics/funnel?projectId=${projectId}`);
         setData(res.data);
       } catch (err) {
         console.error(err);

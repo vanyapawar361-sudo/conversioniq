@@ -38,16 +38,19 @@ io.on('connection', (socket) => {
 });
 
 import authRoutes from './routes/authRoutes';
-
 import eventRoutes from './routes/eventRoutes';
 import projectRoutes from './routes/projectRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
+import insightsRoutes from './routes/insightsRoutes';
+import alertRoutes from './routes/alertRoutes';
 
 // Import API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/insights', insightsRoutes);
+app.use('/api/alerts', alertRoutes);
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 const PORT = process.env.PORT || 5001;
@@ -65,3 +68,5 @@ if (require.main === module) {
 }
 
 export { app, io };
+// reload again
+

@@ -40,9 +40,9 @@ async function seed() {
       passwordHash: hashedPassword,
       role: 'Admin'
     });
-
     // Create Project
     const project = await Project.create({
+      _id: new mongoose.Types.ObjectId('6a1072fec491a8a6be8732a0'),
       organizationId: org._id,
       name: 'Main Storefront',
       domain: 'ecostore.com',

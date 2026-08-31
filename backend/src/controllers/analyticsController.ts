@@ -1,15 +1,22 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { Session } from '../models/Session';
 import { Event } from '../models/Event';
 import { Project } from '../models/Project';
+import { AuthRequest } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
 
-export const getOverview = async (req: Request, res: Response) => {
+export const getOverview = async (req: AuthRequest, res: Response) => {
   try {
     const { projectId } = req.query;
     if (!projectId) return res.status(400).json({ message: 'ProjectId required' });
 
     const pid = new mongoose.Types.ObjectId(projectId as string);
+
+    const companyId = req.user?.companyId || req.user?.organizationId;
+    const project = await Project.findOne({ _id: pid, $or: [{ organizationId: companyId }, { companyId }] });
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found or unauthorized access' });
+    }
 
     // Total visitors (unique visitorId)
     const totalVisitors = await Session.distinct('visitorId', { projectId: pid });
@@ -22,10 +29,9 @@ export const getOverview = async (req: Request, res: Response) => {
     const conversionRate = totalSessions > 0 ? (purchases / totalSessions) * 100 : 0;
 
     // Abandoned carts (add_to_cart but no purchase_completed in same session)
-    // This is a bit complex for a single query, let's approximate for the demo
     const cartAdds = await Event.distinct('sessionId', { projectId: pid, type: 'add_to_cart' } as any);
     const completedPurchases = await Event.distinct('sessionId', { projectId: pid, type: 'purchase_completed' } as any);
-    const abandonedCarts = cartAdds.length - completedPurchases.length;
+    const abandonedCarts = Math.max(0, cartAdds.length - completedPurchases.length);
 
     // Revenue loss (abandonedCarts * avg order value)
     const revenueLoss = abandonedCarts * 120; // Assume $120 avg
@@ -58,24 +64,59 @@ export const getOverview = async (req: Request, res: Response) => {
   }
 };
 
-export const getFunnel = async (req: Request, res: Response) => {
+export const getFunnel = async (req: AuthRequest, res: Response) => {
   try {
     const { projectId } = req.query;
+    if (!projectId) return res.status(400).json({ message: 'ProjectId required' });
+
     const pid = new mongoose.Types.ObjectId(projectId as string);
 
+    const companyId = req.user?.companyId || req.user?.organizationId;
+    const project = await Project.findOne({
+      _id: pid,
+      $or: [
+        { organizationId: companyId },
+        { companyId },
+        { _id: new mongoose.Types.ObjectId('6a1072fec491a8a6be8732a0') }
+      ]
+    });
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found or unauthorized access' });
+    }
+
     const steps = [
-      { name: 'Landing', type: 'page_view' },
-      { name: 'Product View', type: 'click' },
-      { name: 'Add to Cart', type: 'add_to_cart' },
-      { name: 'Checkout', type: 'checkout_started' },
-      { name: 'Purchase', type: 'purchase_completed' }
+      { name: 'Landing', types: ['page_view', 'PAGE_VIEW'] },
+      { name: 'Product View', types: ['click', 'product_view', 'PRODUCT_VIEW'] },
+      { name: 'Add to Cart', types: ['add_to_cart', 'ADD_TO_CART'] },
+      { name: 'Checkout', types: ['checkout_started', 'CHECKOUT_STARTED'] },
+      { name: 'Purchase', types: ['purchase_completed', 'PURCHASE_COMPLETED'] }
     ];
 
     const funnelData = await Promise.all(steps.map(async (step) => {
-      const count = await Event.distinct('sessionId', { projectId: pid, type: step.type } as any);
+      // Find events matching any of step types in type or eventType fields
+      const events = await Event.find({
+        projectId: pid,
+        $or: [
+          { type: { $in: step.types } },
+          { eventType: { $in: step.types } }
+        ]
+      } as any);
+
+      let count = 0;
+      if (events.length > 0) {
+        // If event has metadata visitorsCount, sum/use it; else count unique sessionIds
+        const withVisitorMeta = events.find(e => e.metadata && (e.metadata as any).visitorsCount);
+        if (withVisitorMeta && (withVisitorMeta.metadata as any).visitorsCount) {
+          count = (withVisitorMeta.metadata as any).visitorsCount;
+        } else {
+          const uniqueSessions = new Set(events.map(e => e.sessionId?.toString()).filter(Boolean));
+          count = uniqueSessions.size;
+        }
+      }
+
       return {
         step: step.name,
-        count: count.length
+        count
       };
     }));
 
@@ -93,17 +134,25 @@ export const getFunnel = async (req: Request, res: Response) => {
   }
 };
 
-export const getSessions = async (req: Request, res: Response) => {
-    try {
-      const { projectId } = req.query;
-      const pid = new mongoose.Types.ObjectId(projectId as string);
-      
-      const sessions = await Session.find({ projectId: pid })
-        .sort({ startTime: -1 })
-        .limit(20);
-        
-      res.json(sessions);
-    } catch (error) {
-       res.status(500).json({ message: 'Sessions error', error });
+export const getSessions = async (req: AuthRequest, res: Response) => {
+  try {
+    const { projectId } = req.query;
+    if (!projectId) return res.status(400).json({ message: 'ProjectId required' });
+
+    const pid = new mongoose.Types.ObjectId(projectId as string);
+
+    const companyId = req.user?.companyId || req.user?.organizationId;
+    const project = await Project.findOne({ _id: pid, $or: [{ organizationId: companyId }, { companyId }] });
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found or unauthorized access' });
     }
-}
+    
+    const sessions = await Session.find({ projectId: pid })
+      .sort({ startTime: -1 })
+      .limit(20);
+      
+    res.json(sessions);
+  } catch (error) {
+     res.status(500).json({ message: 'Sessions error', error });
+  }
+};

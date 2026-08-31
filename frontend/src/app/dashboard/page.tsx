@@ -22,7 +22,7 @@ import {
   BarChart,
   Bar
 } from 'recharts';
-import axios from 'axios';
+import api from '@/services/api';
 
 const StatCard = ({ title, value, change, icon: Icon, color, isLoading }: any) => (
   <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
@@ -65,7 +65,7 @@ export default function DashboardPage() {
     const fetchData = async () => {
       try {
         const projectId = '6a1072fec491a8a6be8732a0'; // Demo Project ID
-        const res = await axios.get(`http://localhost:5001/api/analytics/overview?projectId=${projectId}`);
+        const res = await api.get(`/analytics/overview?projectId=${projectId}`);
         setStats(res.data);
       } catch (err) {
         console.error(err);

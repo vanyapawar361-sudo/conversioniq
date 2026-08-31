@@ -13,7 +13,7 @@ import {
   Filter,
   Loader2
 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/services/api';
 import { formatDistanceToNow } from 'date-fns';
 
 const FrustrationBadge = ({ level }: { level: number }) => {
@@ -38,7 +38,7 @@ export default function SessionsPage() {
     const fetchData = async () => {
       try {
         const projectId = '6a1072fec491a8a6be8732a0';
-        const res = await axios.get(`http://localhost:5001/api/analytics/sessions?projectId=${projectId}`);
+        const res = await api.get(`/analytics/sessions?projectId=${projectId}`);
         setSessions(res.data);
       } catch (err) {
         console.error(err);
